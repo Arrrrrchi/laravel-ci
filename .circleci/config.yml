@@ -40,54 +40,56 @@ jobs:
       - image: circleci/php:7.3-node-browsers
     environment: # 環境変数の定義
       AWS_DEFAULT_REGION: ap-northeast-1
-    - checkout
-    - run: sudo composer self-update --1
 
-    # PHP関連パッケージのインストール
-    - restore_cache:
-          key: composer-no-dev-v1-{{ checksum "composer.lock" }}
-      - run: composer install -n --no-dev --prefer-dist # --no-devで開発環境用のパッケージを除外
-      - save_cache:
-          key: composer-no-dev-v1-{{ checksum "composer.lock" }}
-          paths:
-            - vendor
+    steps:
+      - checkout
+      - run: sudo composer self-update --1
 
-      # JavaScript関連パッケージのインストール
+      # PHP関連パッケージのインストール
       - restore_cache:
-          key: npm-v1-{{ checksum "package-lock.json" }}
-      - run:
-          name: npm ci
-          command: |
-            if [ ! -d node_modules ]; then
-              npm ci
-            fi
-      - save_cache:
-          key: npm-v1-{{ checksum "package-lock.json" }}
-          paths:
-            - node_modules
+            key: composer-no-dev-v1-{{ checksum "composer.lock" }}
+        - run: composer install -n --no-dev --prefer-dist # --no-devで開発環境用のパッケージを除外
+        - save_cache:
+            key: composer-no-dev-v1-{{ checksum "composer.lock" }}
+            paths:
+              - vendor
 
-      # JavaScriptのトランスパイルなど
-      - run: npm run prod
+        # JavaScript関連パッケージのインストール
+        - restore_cache:
+            key: npm-v1-{{ checksum "package-lock.json" }}
+        - run:
+            name: npm ci
+            command: |
+              if [ ! -d node_modules ]; then
+                npm ci
+              fi
+        - save_cache:
+            key: npm-v1-{{ checksum "package-lock.json" }}
+            paths:
+              - node_modules
 
-      # ビルド後のファイルをZipファイル化
-      - run:
-          name: archive artifacts
-          command: zip -ryq laravel-ci.zip .
+        # JavaScriptのトランスパイルなど
+        - run: npm run prod
 
-      # AWS CLIのインストール
-      - aws-cli/install
-      - run:
-          name: upload artifacts to s3
-          command: aws s3 cp laravel-ci.zip s3://${AWS_S3_BUCKET_NAME}
-      
-      #CodeDeployのデプロイメントの作成
-      - run:
-          name: deploy to prod
-          command: |
-            aws deploy create-deployment \
-            --application-name laravel-ci \
-            --deployment-group-name laravel-ci \
-            --s3-location bucket=${AWS_S3_BUCKET_NAME},key=laravel-ci.zip,bundleType=zip
+        # ビルド後のファイルをZipファイル化
+        - run:
+            name: archive artifacts
+            command: zip -ryq laravel-ci.zip .
+
+        # AWS CLIのインストール
+        - aws-cli/install
+        - run:
+            name: upload artifacts to s3
+            command: aws s3 cp laravel-ci.zip s3://${AWS_S3_BUCKET_NAME}
+        
+        #CodeDeployのデプロイメントの作成
+        - run:
+            name: deploy to prod
+            command: |
+              aws deploy create-deployment \
+              --application-name laravel-ci \
+              --deployment-group-name laravel-ci \
+              --s3-location bucket=${AWS_S3_BUCKET_NAME},key=laravel-ci.zip,bundleType=zip
 
 orbs:
   aws-cli: circleci/aws-cli@1.0.0
